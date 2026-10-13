@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>七分钟 · 阿波罗长廊</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden}
+  body{
+    background:#07090d;color:#cfd6e0;
+    font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    display:flex;justify-content:center;
+  }
+  #app{
+    width:100%;max-width:760px;height:100%;
+    display:flex;flex-direction:column;position:relative;
+    background:radial-gradient(ellipse at 50% 0%,#131a26 0%,#07090d 72%);
+    overflow:hidden;
+  }
+  #app::after{
+    content:'';position:absolute;inset:0;pointer-events:none;z-index:8;
+    background:radial-gradient(ellipse at center,transparent 42%,rgba(0,0,0,.8) 100%);
+  }
+  #grain{
+    position:absolute;inset:0;pointer-events:none;z-index:9;
+    opacity:.05;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  #alarmOverlay{
+    position:absolute;inset:0;pointer-events:none;z-index:7;
+    opacity:0;transition:opacity .3s;
+    background:radial-gradient(ellipse at center,transparent 45%,rgba(200,30,30,.55) 100%);
+  }
+  #alarmOverlay.on{animation:alarmPulse 1.1s ease-in-out infinite}
+  @keyframes alarmPulse{0%,100%{opacity:.15}50%{opacity:.55}}
+
+  .shake{animation:shake .35s ease}
+  @keyframes shake{
+    0%,100%{transform:translate(0,0)}
+    20%{transform:translate(-5px,3px)}
+    40%{transform:translate(5px,-3px)}
+    60%{transform:translate(-4px,-2px)}
+    80%{transform:translate(4px,2px)}
+  }
+
+  #modeScreen{
+    position:absolute;inset:0;z-index:20;
+    display:flex;flex-direction:column;justify-content:center;
+    padding:40px 30px;
+    background:radial-gradient(ellipse at 50% 30%,rgba(30,42,62,.6) 0%,rgba(7,9,13,.98) 70%);
+    transition:opacity .6s ease,visibility .6s;
+  }
+  #modeScreen.hide{opacity:0;visibility:hidden;pointer-events:none}
+  .mode-title{font-size:13px;letter-spacing:.4em;color:#c9a227;margin-bottom:14px;text-align:center}
+  .mode-h1{font-size:28px;font-weight:600;color:#e8d9a0;text-align:center;margin-bottom:8px;letter-spacing:.06em}
+  .mode-sub{font-size:13px;color:#7d8798;text-align:center;margin-bottom:44px;line-height:1.9;letter-spacing:.05em}
+  .mode-card{
+    border:1px solid rgba(201,162,39,.28);background:rgba(7,9,13,.7);
+    padding:22px 20px;margin-bottom:16px;cursor:pointer;transition:all .22s;border-radius:3px;
+  }
+  .mode-card:hover{border-color:#c9a227;background:rgba(201,162,39,.08);transform:translateX(4px);box-shadow:-3px 0 0 0 #c9a227}
+  .mode-card h2{font-size:17px;font-weight:600;color:#e8d9a0;margin-bottom:10px;letter-spacing:.05em}
+  .mode-card p{font-size:13px;color:#8b95a5;line-height:1.85}
+  .mode-card .tag{
+    display:inline-block;font-size:10px;letter-spacing:.2em;padding:3px 9px;margin-left:8px;
+    border-radius:1px;border:1px solid rgba(201,162,39,.5);color:#c9a227;
+    background:rgba(201,162,39,.08);vertical-align:middle;
+  }
+  .mode-card.fact .tag{border-color:rgba(217,83,79,.5);color:#d9534f;background:rgba(217,83,79,.08)}
+
+  #hud{
+    display:flex;gap:14px;padding:15px 18px 13px;
+    border-bottom:1px solid rgba(201,162,39,.18);
+    position:relative;z-index:6;flex-shrink:0;background:rgba(7,9,13,.6);
+  }
+  .hud-item{display:flex;flex-direction:column;gap:5px;flex:1}
+  .hud-label{font-size:10px;color:#5d6778;letter-spacing:.18em}
+  .hud-val{font-size:15px;color:#c9a227;font-variant-numeric:tabular-nums;letter-spacing:.05em;transition:color .3s}
+  .hud-val.danger{color:#d9534f}
+  #bar{height:3px;background:rgba(255,255,255,.08);margin-top:3px;overflow:hidden;border-radius:2px}
+  #bar>i{display:block;height:100%;width:100%;background:#c9a227;transition:width .12s linear;border-radius:2px}
+  #bar>i.danger{background:#d9534f}
+
+  #screen{
+    flex:1;padding:28px 24px 32px;overflow-y:auto;
+    display:flex;flex-direction:column;
+    position:relative;z-index:6;scrollbar-width:thin;
+    scrollbar-color:rgba(201,162,39,.3) transparent;
+    transition:background-image 1s ease-in-out;
+    background-size:cover;background-position:center;
+    background-blend-mode:soft-light;background-color:rgba(7,9,13,0.6);
+  }
+  #screen::-webkit-scrollbar{width:4px}
+  #screen::-webkit-scrollbar-thumb{background:rgba(201,162,39,.3);border-radius:2px}
+
+  #text{
+    font-size:16px;line-height:2;letter-spacing:.02em;color:#c3cbd8;
+    flex:1;min-height:120px;text-shadow:0 1px 4px rgba(0,0,0,0.95), 0 0 12px rgba(0,0,0,0.7);
+  }
+  .cursor{color:#c9a227;animation:blink .7s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+
+  #choices{display:flex;flex-direction:column;gap:10px;margin-top:24px}
+  .choice{
+    background:rgba(7,9,13,.78);border:1px solid rgba(201,162,39,.28);
+    color:#d8c78a;padding:14px 18px;font-size:14px;text-align:left;cursor:pointer;
+    font-family:inherit;letter-spacing:.04em;line-height:1.5;
+    transition:all .18s;position:relative;border-radius:2px;backdrop-filter:blur(3px);
+  }
+  .choice:hover,.choice:active{
+    background:rgba(201,162,39,.18);border-color:#c9a227;color:#f0e0a8;
+    transform:translateX(5px);box-shadow:-3px 0 0 0 #c9a227;
+  }
+  .choice::before{content:'▸';color:#c9a227;margin-right:10px;font-size:12px}
+  .choice.locked{border-color:rgba(217,83,79,.4);background:rgba(7,9,13,.8);color:#c9a227;cursor:default}
+  .choice.locked:hover{transform:none;box-shadow:none;background:rgba(217,83,79,.08)}
+  .choice.locked::before{content:'▣';color:#d9534f}
+
+  .fact-note{
+    margin-top:12px;padding:11px 14px;border-left:2px solid rgba(217,83,79,.5);
+    background:rgba(7,9,13,.85);font-size:12px;line-height:1.85;color:#9ba5b5;
+    letter-spacing:.02em;border-radius:2px;animation:fadeIn .4s ease;
+  }
+  .fact-note b{color:#d9534f;font-weight:600;letter-spacing:.1em;font-size:11px}
+
+  .fact-inline{
+    margin-top:16px;padding:12px 15px;border-left:2px solid rgba(217,83,79,.5);
+    background:rgba(7,9,13,.85);font-size:13px;line-height:1.9;color:#9ba5b5;
+    letter-spacing:.02em;border-radius:2px;animation:fadeIn .5s ease;
+  }
+  .fact-inline b{color:#d9534f;font-weight:600;letter-spacing:.1em;font-size:11px}
+
+  .mg{margin-top:24px;animation:mgIn .35s ease}
+  @keyframes mgIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+  .mg-title{font-size:12px;color:#8b95a5;margin-bottom:12px;letter-spacing:.1em;line-height:1.7}
+  .mg-bar{
+    position:relative;height:42px;width:100%;background:rgba(7,9,13,.7);
+    border:1px solid rgba(201,162,39,.3);cursor:pointer;overflow:hidden;
+    user-select:none;border-radius:2px;transition:border-color .2s;
+  }
+  .mg-bar:active{border-color:#c9a227}
+  .mg-zone{
+    position:absolute;top:0;bottom:0;
+    background:linear-gradient(180deg,rgba(201,162,39,.1),rgba(201,162,39,.28),rgba(201,162,39,.1));
+    border-left:1px solid rgba(201,162,39,.8);border-right:1px solid rgba(201,162,39,.8);
+    transition:left .15s,width .15s;
+  }
+  .mg-pointer{
+    position:absolute;top:0;bottom:0;width:3px;background:#e8d9a0;
+    box-shadow:0 0 14px #c9a227,0 0 4px #fff;border-radius:2px;
+  }
+  .mg-stat{display:flex;justify-content:space-between;font-size:12px;color:#5d6778;margin-top:10px;letter-spacing:.06em}
+  .mg-stat b{color:#c9a227;font-weight:600}
+  .mg-stat b.miss{color:#d9534f}
+
+  .ending{animation:fadeIn .7s ease}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  .ending-tag{display:inline-block;font-size:11px;letter-spacing:.35em;padding:5px 12px;margin-bottom:18px;border-radius:1px}
+  .ending-tag.ok{color:#c9a227;border:1px solid rgba(201,162,39,.5);background:rgba(201,162,39,.06)}
+  .ending-tag.bad{color:#d9534f;border:1px solid rgba(217,83,79,.5);background:rgba(217,83,79,.06)}
+  .ending-tag.fact{color:#c9a227;border:1px solid rgba(201,162,39,.5);background:rgba(201,162,39,.06)}
+  .ending h1{font-size:26px;font-weight:600;color:#e8d9a0;margin-bottom:20px;letter-spacing:.06em}
+  .ending p{font-size:15px;line-height:2.05;color:#a8b2c0}
+
+  .rank-card{
+    margin-top:26px;padding:20px;border:1px solid rgba(201,162,39,.25);
+    background:rgba(7,9,13,.75);display:flex;align-items:center;gap:22px;border-radius:3px;
+  }
+  .rank-letter{
+    font-size:52px;font-weight:700;color:#c9a227;line-height:1;
+    letter-spacing:-.02em;text-shadow:0 0 24px rgba(201,162,39,.5);min-width:64px;text-align:center;
+  }
+  .rank-letter.d{color:#d9534f;text-shadow:0 0 24px rgba(217,83,79,.5)}
+  .rank-detail{flex:1;font-size:13px;color:#8b95a5;line-height:1.9}
+  .rank-detail span{color:#c9a227;font-variant-numeric:tabular-nums}
+  .rank-score{font-size:11px;letter-spacing:.15em;color:#5d6778;margin-top:6px}
+  .bonus-tag{
+    display:inline-block;font-size:10px;letter-spacing:.2em;color:#e8d9a0;
+    border:1px solid rgba(201,162,39,.5);padding:2px 8px;margin-left:8px;
+    border-radius:1px;background:rgba(201,162,39,.1);
+  }
+
+  .fact-box{
+    margin-top:22px;padding:14px 16px;border-left:2px solid rgba(201,162,39,.4);
+    background:rgba(7,9,13,.75);font-size:13px;line-height:1.9;color:#7d8798;
+  }
+  .fact-box b{color:#a8b2c0;font-weight:600}
+  .fact-box .k{color:#c9a227}
+
+  .summary-panel{
+    margin-top:24px;padding:20px;border:1px solid rgba(201,162,39,.3);
+    background:rgba(7,9,13,.8);border-radius:3px;
+  }
+  .summary-panel h2{font-size:13px;letter-spacing:.25em;color:#c9a227;margin-bottom:16px;font-weight:600}
+  .summary-panel ul{list-style:none;padding:0}
+  .summary-panel li{
+    font-size:13.5px;line-height:1.95;color:#9ba5b5;padding-left:18px;
+    position:relative;margin-bottom:9px;
+  }
+  .summary-panel li::before{content:'·';position:absolute;left:0;color:#c9a227;font-weight:700;font-size:20px;line-height:1.4}
+  .summary-panel li b{color:#d8c78a;font-weight:600}
+  .summary-source{
+    margin-top:18px;padding-top:14px;border-top:1px solid rgba(201,162,39,.15);
+    font-size:12px;color:#5d6778;line-height:1.85;font-style:italic;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="grain"></div>
+  <div id="alarmOverlay"></div>
+
+  <div id="modeScreen">
+    <div class="mode-title">2025 · 卢浮宫失窃案</div>
+    <div class="mode-h1">七分钟 · 阿波罗长廊</div>
+    <div class="mode-sub">以劫匪第一人称视角还原的互动叙事<br>选择一种方式进入这段真实发生过的七分钟</div>
+
+    <div class="mode-card" data-mode="free">
+      <h2>自由模式 <span class="tag">FREE</span></h2>
+      <p>你可以做出不同的选择。看看你能不能比真实劫匪更快、更贪，或者更倒霉。评分会告诉你做得怎么样。</p>
+    </div>
+
+    <div class="mode-card fact" data-mode="fact">
+      <h2>史实模式 <span class="tag">FACT</span></h2>
+      <p>每一步都被锁定在2025年10月19日真实发生的那一个选择上。你只能旁观，不能改变。每一个决策点都会附带一句事实注记。</p>
+    </div>
+  </div>
+
+  <div id="hud">
+    <div class="hud-item">
+      <span class="hud-label">剩余时间</span>
+      <span class="hud-val" id="timeVal">7:00</span>
+      <div id="bar"><i id="barFill"></i></div>
+    </div>
+    <div class="hud-item">
+      <span class="hud-label">到手</span>
+      <span class="hud-val" id="lootVal">0 件</span>
+    </div>
+    <div class="hud-item">
+      <span class="hud-label">警报</span>
+      <span class="hud-val" id="alertVal">0%</span>
+    </div>
+  </div>
+
+  <div id="screen">
+    <div id="text"></div>
+    <div id="choices"></div>
+    <div id="minigame"></div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   七分钟 · 阿波罗长廊
+   2025年卢浮宫失窃案 · 互动叙事
+   事实来源：法国内政部、巴黎检方、卢浮宫公告、
+             法国参议院听证会记录、多家媒体公开报道
+   背景图片来源：Wikimedia Commons（公共领域 / CC BY-SA）
+   ========================================================= */
+
+let gameMode = 'free';
+let tickGeneration = 0;
+
+/* ---------- 场景背景图（已验证可用链接） ---------- */
+const bgImages = {
+  // 开场：卢浮宫从塞纳河看的外观
+  intro:    'url("https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Louvre_vu_de_la_Seine.jpg/1280px-Louvre_vu_de_la_Seine.jpg")',
+
+  // 破窗：阿波罗长廊全景（聚焦拱顶）
+  window:   'url("https://upload.wikimedia.org/wikipedia/commons/c/c8/Apollo_Gallery%2C_Louvre.JPG")',
+
+  // 进入长廊：阿波罗长廊全景
+  enter:    'url("https://upload.wikimedia.org/wikipedia/commons/c/c8/Apollo_Gallery%2C_Louvre.JPG")',
+
+  // 切割展柜：阿波罗长廊全景
+  cutcase:  'url("https://upload.wikimedia.org/wikipedia/commons/c/c8/Apollo_Gallery%2C_Louvre.JPG")',
+
+  // 取宝：欧仁妮皇后皇冠（使用 Special:FilePath 确保可用）
+  loot:     'url("https://commons.wikimedia.org/wiki/Special:FilePath/Crown_of_Empress_Eugenie.png")',
+
+  // 对峙：阿波罗长廊纵深视角
+  guard:    'url("https://upload.wikimedia.org/wikipedia/commons/c/c8/Apollo_Gallery%2C_Louvre.JPG")',
+
+  // 阳台：欧仁妮皇后皇冠（皇冠掉落在这里）
+  balcony:  'url("https://commons.wikimedia.org/wiki/Special:FilePath/Crown_of_Empress_Eugenie.png")',
+
+  // 撤离：塞纳河上的协和桥
+  escape:   'url("https://upload.wikimedia.org/wikipedia/commons/2/29/Pont_de_la_Concorde_Paris_FRA_005.JPG")',
+
+  // 结局：欧仁妮皇后皇冠
+  end:      'url("https://commons.wikimedia.org/wiki/Special:FilePath/Crown_of_Empress_Eugenie.png")'
+};
+
+function setBackground(sceneName) {
+  if (bgImages[sceneName]) {
+    screenEl.style.backgroundImage = bgImages[sceneName];
+  }
+}
+
+/* ---------- 音效系统 ---------- */
+const Sound = {
+  ctx: null, ambientNode: null, ambientGain: null,
+
+  init() {
+    if (this.ctx) return;
+    try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { this.ctx = null; }
+  },
+
+  tone(freq, dur, type = 'sine', vol = 0.08, slide = 0, delay = 0) {
+    if (!this.ctx) return;
+    try {
+      const t = this.ctx.currentTime + delay;
+      const o = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      o.type = type;
+      o.frequency.setValueAtTime(freq, t);
+      if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, freq + slide), t + dur);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(vol, t + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(this.ctx.destination);
+      o.start(t); o.stop(t + dur + 0.03);
+    } catch (e) {}
+  },
+
+  ambient(level = 0.025) {
+    if (!this.ctx) return;
+    this.stopAmbient();
+    try {
+      const t = this.ctx.currentTime;
+      const o = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(48, t);
+      o.frequency.linearRampToValueAtTime(42, t + 8);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(level, t + 1.5);
+      o.connect(g); g.connect(this.ctx.destination);
+      o.start(t);
+      this.ambientNode = o; this.ambientGain = g;
+    } catch (e) {}
+  },
+
+  stopAmbient() {
+    if (this.ambientNode) {
+      try {
+        const t = this.ctx.currentTime;
+        this.ambientGain.gain.cancelScheduledValues(t);
+        this.ambientGain.gain.setValueAtTime(this.ambientGain.gain.value, t);
+        this.ambientGain.gain.linearRampToValueAtTime(0.0001, t + 0.6);
+        this.ambientNode.stop(t + 0.7);
+      } catch (e) {}
+      this.ambientNode = null; this.ambientGain = null;
+    }
+  },
+
+  type() { this.tone(1400 + Math.random() * 300, 0.02, 'square', 0.012); },
+  click() { this.tone(660, 0.08, 'triangle', 0.06, -200); },
+  cut() {
+    if (!this.ctx) return;
+    try {
+      const t = this.ctx.currentTime;
+      const o = this.ctx.createOscillator(); const g = this.ctx.createGain(); const f = this.ctx.createBiquadFilter();
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(220, t); o.frequency.linearRampToValueAtTime(90, t + 0.55);
+      f.type = 'bandpass'; f.frequency.value = 1100; f.Q.value = 2.5;
+      g.gain.setValueAtTime(0.055, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+      o.connect(f); f.connect(g); g.connect(this.ctx.destination);
+      o.start(t); o.stop(t + 0.58);
+    } catch (e) {}
+  },
+  glass() {
+    for (let i = 0; i < 7; i++) { this.tone(1800 + Math.random() * 2800, 0.05 + Math.random() * 0.05, 'triangle', 0.045, 0, i * 0.035); }
+    this.tone(180, 0.3, 'sawtooth', 0.06, -100, 0.02);
+  },
+  thud() { this.tone(90, 0.25, 'sine', 0.1, -40); this.tone(60, 0.4, 'sine', 0.06, -20, 0.05); },
+  win() { this.tone(660, 0.12, 'sine', 0.09); this.tone(880, 0.18, 'sine', 0.09, 0, 0.1); },
+  fail() { this.tone(220, 0.25, 'sawtooth', 0.08, -80); },
+  alarm() {
+    for (let i = 0; i < 4; i++) {
+      this.tone(880, 0.18, 'square', 0.045, 0, i * 0.24);
+      this.tone(660, 0.18, 'square', 0.045, 0, i * 0.24 + 0.12);
+    }
+  },
+  heartbeat() { this.tone(60, 0.15, 'sine', 0.08, -20); this.tone(55, 0.2, 'sine', 0.06, -20, 0.18); }
+};
+
+/* ---------- 游戏状态 ---------- */
+const TOTAL_TIME = 420;
+const TIME_SCALE_FREE = 2.2;
+const TIME_SCALE_FACT = 0.35;
+
+const state = { time: TOTAL_TIME, loot: 0, alert: 0, running: false, cuts: 0, mistakes: 0, choicesMade: 0 };
+
+/* ---------- DOM 引用 ---------- */
+const $ = id => document.getElementById(id);
+const screenEl = $('screen'), textEl = $('text'), choicesEl = $('choices');
+const minigameEl = $('minigame'), alarmOverlay = $('alarmOverlay'), modeScreen = $('modeScreen');
+
+/* ---------- 打字机 ---------- */
+let typing = false, typeSkip = false, typeTimer = null;
+
+function typeText(text, cb, factText) {
+  clearTimeout(typeTimer);
+  let i = 0, done = false;
+  typing = true; typeSkip = false;
+
+  const finish = () => {
+    if (done) return; done = true; typing = false;
+    let html = text.replace(/\n/g, '<br>');
+    if (factText && gameMode === 'fact') {
+      html += '<div class="fact-inline"><b>事实注记</b><br>' + factText + '</div>';
+    }
+    textEl.innerHTML = html;
+    if (cb) cb();
+  };
+
+  const step = () => {
+    if (typeSkip) return finish();
+    i++;
+    if (i % 3 === 0) Sound.type();
+    if (i >= text.length) return finish();
+    textEl.innerHTML = text.slice(0, i).replace(/\n/g, '<br>') + '<span class="cursor">▌</span>';
+    typeTimer = setTimeout(step, 16);
+  };
+  step();
+}
+
+screenEl.addEventListener('click', e => {
+  if (e.target.closest('.choice,.mg-bar')) return;
+  if (typing) typeSkip = true;
+});
+
+/* ---------- HUD ---------- */
+function updateHUD() {
+  const t = Math.max(0, state.time);
+  $('timeVal').textContent = Math.floor(t / 60) + ':' + String(Math.floor(t % 60)).padStart(2, '0');
+  const pct = t / TOTAL_TIME * 100;
+  const fill = $('barFill'); fill.style.width = pct + '%'; fill.className = pct < 30 ? 'danger' : '';
+  $('lootVal').textContent = state.loot + ' 件';
+  const av = $('alertVal'); av.textContent = Math.min(100, Math.round(state.alert)) + '%';
+  av.className = 'hud-val' + (state.alert >= 70 ? ' danger' : '');
+  if (state.alert >= 60) alarmOverlay.classList.add('on'); else alarmOverlay.classList.remove('on');
+}
+
+function spendTime(n) { state.time = Math.max(0, state.time - n); updateHUD(); }
+function addLoot(n) { state.loot += n; updateHUD(); }
+function addAlert(n) { state.alert = Math.min(100, state.alert + n); updateHUD(); }
+function shakeScreen() { const app = $('app'); app.classList.remove('shake'); void app.offsetWidth; app.classList.add('shake'); }
+
+/* ---------- 主循环 ---------- */
+function startTick() {
+  state.running = true;
+  const myGen = ++tickGeneration;
+  let last = performance.now();
+  const loop = now => {
+    if (!state.running || myGen !== tickGeneration) return;
+    const dt = (now - last) / 1000; last = now;
+    const scale = gameMode === 'fact' ? TIME_SCALE_FACT : TIME_SCALE_FREE;
+    state.time -= dt * scale;
+    if (state.time <= 0) {
+      state.time = 0; updateHUD();
+      if (gameMode === 'free') return gameOver(); return;
+    }
+    updateHUD(); requestAnimationFrame(loop);
+  };
+  requestAnimationFrame(loop);
+}
+
+function stopTick() { state.running = false; tickGeneration++; }
+
+/* ---------- 选项渲染 ---------- */
+function setChoices(list) {
+  choicesEl.innerHTML = '';
+  if (gameMode === 'fact') {
+    const locked = list.find(item => item.locked) || list[0];
+    const btn = document.createElement('button');
+    btn.className = 'choice locked'; btn.textContent = locked.label;
+    btn.onclick = () => { Sound.click(); if (typing) typeSkip = true; locked.act(); };
+    choicesEl.appendChild(btn);
+    if (locked.factNote) {
+      const note = document.createElement('div');
+      note.className = 'fact-note'; note.innerHTML = '<b>史实</b><br>' + locked.factNote;
+      choicesEl.appendChild(note);
+    }
+  } else {
+    list.forEach(item => {
+      const btn = document.createElement('button');
+      btn.className = 'choice'; btn.textContent = item.label;
+      btn.onclick = () => { Sound.click(); state.choicesMade++; if (typing) typeSkip = true; item.act(); };
+      choicesEl.appendChild(btn);
+    });
+  }
+}
+
+/* ---------- 小游戏 ---------- */
+function startMiniGame(opts) {
+  const need = opts.need, speed = opts.speed, zoneW = opts.zoneW;
+  minigameEl.innerHTML =
+    '<div class="mg">' +
+      '<div class="mg-title">' + opts.title + '</div>' +
+      '<div class="mg-bar" id="mgBar"><div class="mg-zone" id="mgZone"></div><div class="mg-pointer" id="mgPtr"></div></div>' +
+      '<div class="mg-stat"><span>命中 <b id="mgHit">0</b> / ' + need + '</span><span>失误 <b id="mgMiss" class="miss">0</b> / 3</span></div>' +
+    '</div>';
+
+  const bar = document.getElementById('mgBar'), zone = document.getElementById('mgZone'), ptr = document.getElementById('mgPtr');
+  let pos = 0, dir = 1, hits = 0, miss = 0;
+  let zoneStart = Math.random() * (100 - zoneW);
+  let alive = true, last = performance.now(), raf = 0;
+
+  function drawZone() { zone.style.left = zoneStart + '%'; zone.style.width = zoneW + '%'; }
+  drawZone();
+
+  function loop(now) {
+    if (!alive) return;
+    const dt = Math.min(now - last, 50); last = now;
+    pos += dir * speed * (dt / 16);
+    if (pos >= 100) { pos = 100; dir = -1; }
+    if (pos <= 0) { pos = 0; dir = 1; }
+    ptr.style.left = pos + '%'; raf = requestAnimationFrame(loop);
+  }
+  raf = requestAnimationFrame(loop);
+
+  function cleanup() { alive = false; cancelAnimationFrame(raf); document.removeEventListener('keydown', keyHandler); }
+
+  function attempt() {
+    if (!alive) return;
+    const inZone = pos >= zoneStart && pos <= zoneStart + zoneW;
+    if (inZone) {
+      hits++; state.cuts++; Sound.cut();
+      document.getElementById('mgHit').textContent = hits;
+      zoneStart = Math.random() * (100 - zoneW); drawZone();
+      if (hits >= need) { cleanup(); Sound.win(); setTimeout(() => { minigameEl.innerHTML = ''; opts.onWin(); }, 350); }
+    } else {
+      miss++; state.mistakes++; addAlert(8); shakeScreen(); Sound.fail();
+      document.getElementById('mgMiss').textContent = miss;
+      if (miss >= 3) { cleanup(); setTimeout(() => { minigameEl.innerHTML = ''; opts.onFail(); }, 400); }
+    }
+  }
+
+  function keyHandler(e) { if (e.code === 'Space' || e.key === ' ') { e.preventDefault(); attempt(); } }
+  bar.addEventListener('click', attempt);
+  document.addEventListener('keydown', keyHandler);
+}
+
+/* ---------- 场景路由 ---------- */
+function go(name) {
+  choicesEl.innerHTML = ''; minigameEl.innerHTML = '';
+  setBackground(name); Sound.ambient(0.02); S[name]();
+}
+
+const S = {};
+
+S.intro = () => {
+  typeText(
+    '2025年10月19日。上午9点30分。\n\n塞纳河一侧的外墙施工区。\n\n你穿着黄色反光马甲，戴着安全帽和黑色面罩，站在一台电动升降吊篮里。\n\n卡车是偷来的。马甲是五金店买的。我们一共四个人——两个人上去，两个人骑摩托车在下面等着。吊篮正在上升。',
+    () => { setChoices([{ label: '继续上升，到二层阳台', act: () => go('window'), locked: true, factNote: '2025年10月19日卢浮宫失窃案共有4名劫匪：2人伪装成施工人员，乘升降吊篮从塞纳河一侧外墙进入阿波罗长廊作案；另外2人骑摩托车在外接应。' }]); },
+    '2025年10月19日卢浮宫失窃案共有4名劫匪：2人伪装成施工人员，乘升降吊篮从塞纳河一侧外墙进入阿波罗长廊作案；另外2人骑摩托车在外接应。'
+  );
+};
+
+S.window = () => {
+  typeText(
+    '二层阳台到了。\n\n阿波罗长廊的窗户就在眼前——面向塞纳河的高窗，木框，单层老玻璃。\n\n你举起角磨机。切下去。',
+    () => {
+      startMiniGame({
+        title: '切割窗玻璃 · 指针进入金色区域时点击（空格或触摸）', need: 2, speed: 0.62, zoneW: 22,
+        onWin: () => { Sound.glass(); Sound.thud(); go('enter'); },
+        onFail: () => { addAlert(15); Sound.glass(); go('enter'); }
+      });
+    },
+    '劫匪使用角磨机切割窗户玻璃，从外部阳台进入阿波罗长廊。切割声音被记录为“类似白噪音的声响”。'
+  );
+};
+
+S.enter = () => {
+  typeText(
+    '玻璃碎了。你先翻进去，脚踩在碎玻璃上咔嚓响。\n\n阿波罗长廊。61.34米长，15米高的拱顶，德拉克罗瓦的《阿波罗击杀巨蟒》在头顶。\n\n两侧全是展柜。灯是亮的。\n\n走廊尽头，五名身穿深色制服的博物馆工作人员站着。距离你大约十五米。\n\n他们没有动。',
+    () => { setChoices([{ label: '直奔第一个展柜——欧仁妮皇后的冠冕', act: () => go('cutcase'), locked: true, factNote: '阿波罗长廊内共有5名博物馆工作人员在场，均无武器。他们做出了专业应对，确保无人员伤亡。' }]); },
+    '阿波罗长廊全长61.34米，总面积约600平方米，由路易十四时期建造。案发时展厅内有5名工作人员，均无武器。'
+  );
+};
+
+S.cutcase = () => {
+  typeText(
+    '第一个展柜。里面是欧仁妮皇后的冠冕，旁边是玛丽-阿梅莉王后与奥尔唐斯王后的蓝宝石套装。\n\n玻璃很厚。角磨机切上去，火花溅在护目镜上。\n\n声音比你想的大。',
+    () => {
+      startMiniGame({
+        title: '切割展柜 · 指针进入金色区域时点击（3次）', need: 3, speed: 0.78, zoneW: 18,
+        onWin: () => go('loot'), onFail: () => { addAlert(18); go('loot'); }
+      });
+    },
+    '劫匪使用角磨机切割展柜玻璃，用拳头和肘部重击玻璃，伸手取走珠宝。从破窗进入到拿到东西，整个过程不到四分钟。'
+  );
+};
+
+S.loot = () => {
+  const lootChoices = [
+    { label: '抓走冠冕和蓝宝石套装（3件）', act: () => { addLoot(3); spendTime(35); go('guard'); } },
+    { label: '只抓冠冕，动作最快（1件）', act: () => { addLoot(1); spendTime(12); go('guard'); } },
+    { label: '全扫，五件都拿（5件，但慢）', act: () => { addLoot(5); spendTime(75); addAlert(15); go('guard'); }, locked: true, factNote: '劫匪共抢走9件珠宝，其中8件为具有无法估量历史价值的王室珍品。经济损失预估8800万欧元。重逾140克拉的“摄政王钻石”未被抢走。' }
+  ];
+  typeText(
+    '玻璃塌下去了。\n\n展柜里躺着五件东西：欧仁妮皇后的冠冕、玛丽-阿梅莉王后与奥尔唐斯王后的蓝宝石套装、圣物匣式胸针、大襟花胸针。\n\n你没有多少秒。',
+    () => { setChoices(lootChoices); },
+    '劫匪共抢走9件珠宝，其中8件为具有无法估量历史价值的王室珍品。经济损失预估8800万欧元。'
+  );
+};
+
+S.guard = () => {
+  const guardChoices = [
+    { label: '举起角磨机，朝他们晃一下', act: () => { addAlert(18); spendTime(8); go('balcony'); }, locked: true, factNote: '卢浮宫馆长在参议院听证会上确认，劫匪“用角磨机威胁保安”。阿波罗长廊内共有5名工作人员，均无武器，无人伤亡。' },
+    { label: '无视他们，继续取', act: () => { addAlert(38); spendTime(30); go('balcony'); } },
+    { label: '立刻撤退', act: () => { addAlert(8); spendTime(0); go('balcony'); } }
+  ];
+  typeText(
+    '走廊那头，工作人员还站着。\n\n他们没有动。手里没有武器。\n\n你手里有一台还在转的角磨机。',
+    () => { setChoices(guardChoices); },
+    '劫匪用角磨机威胁博物馆工作人员。卢浮宫馆长在参议院听证会上确认了这一细节，并承认博物馆“没有提前充分发现小偷的到来”。'
+  );
+};
+
+S.balcony = () => {
+  const balconyChoices = [
+    { label: '不回头，直接下降', act: () => { go('escape'); }, locked: true, factNote: '欧仁妮皇后的王冠在逃离时被遗弃在卢浮宫外部阳台的石质地面上。王冠缺失1只金鹰饰件和约10颗底座周缘小钻，56颗祖母绿完好，1354颗钻石中仅约10颗遗失，具备整体修复条件。' },
+    { label: '回头捡起来', act: () => { addLoot(1); addAlert(22); spendTime(45); go('escape'); } }
+  ];
+  typeText(
+    '你翻出窗户，踩上阳台。\n\n袋子很沉。冠冕卡在袋口。\n\n你跳上吊篮的一瞬间——它掉了。\n\n欧仁妮皇后的冠冕，摔在石头上。一只金鹰饰件弹了出去，滚到墙根。',
+    () => { setChoices(balconyChoices); },
+    '欧仁妮皇后的王冠被遗弃在卢浮宫外部阳台的石质地面上，金属结构明显受损。'
+  );
+};
+
+S.escape = () => {
+  Sound.alarm(); shakeScreen();
+  const escapeChoices = [
+    { label: '泼汽油烧掉卡车，再走', act: () => { addAlert(25); spendTime(40); go('end'); }, locked: true, factNote: '嫌犯试图纵火焚毁升降装置时被一名卢浮宫员工阻止。保安在到达现场时闻到“非常浓烈的汽油味”，发现车辆油箱被刺破，劫匪的计划被“打乱”。劫匪随即骑摩托车逃离。' },
+    { label: '直接走，别管卡车', act: () => { spendTime(5); go('end'); } }
+  ];
+  typeText(
+    '9点37分。警报响了。\n\n吊篮落地。街边停着两辆雅马哈TMAX，引擎没熄。同伙递给你头盔。\n\n你们将沿塞纳河畔，经环城大道，朝A6高速公路方向逃逸。\n\n卡车还在。你手里有一桶汽油。',
+    () => { setChoices(escapeChoices); },
+    '9时37分博物馆通知关闭大门，9时38分盗贼携带展品骑摩托车逃离。整个作案过程仅持续约4到7分钟。'
+  );
+};
+
+S.end = () => {
+  stopTick(); Sound.stopAmbient();
+  if (gameMode === 'fact') return showFactEnding();
+  if (state.alert >= 100) return showEnding('caught');
+  showEnding('escaped');
+};
+
+function gameOver() { if (!state.running) return; stopTick(); Sound.stopAmbient(); showEnding('timeout'); }
+
+function calcScore() {
+  const timeLeft = Math.max(0, state.time);
+  const timeScore = Math.round(timeLeft / TOTAL_TIME * 50);
+  const lootScore = Math.min(30, state.loot * 6);
+  const alertScore = Math.round((100 - state.alert) / 100 * 20);
+  let efficiencyBonus = 0;
+  if (timeLeft > TOTAL_TIME * 0.5) efficiencyBonus = 10;
+  const total = Math.min(100, timeScore + lootScore + alertScore + efficiencyBonus);
+  let rank = 'D';
+  if (total >= 90) rank = 'S'; else if (total >= 75) rank = 'A'; else if (total >= 60) rank = 'B'; else if (total >= 40) rank = 'C';
+  return { total, rank, timeScore, lootScore, alertScore, efficiencyBonus };
+}
+
+function showFactEnding() {
+  clearTimeout(typeTimer); typing = false; choicesEl.innerHTML = ''; minigameEl.innerHTML = '';
+  alarmOverlay.classList.remove('on'); screenEl.style.backgroundImage = bgImages.end;
+  textEl.innerHTML =
+    '<div class="ending">' +
+      '<div class="ending-tag fact">FACT · 史实</div>' +
+      '<h1>你刚刚经历的，就是真实发生的全部</h1>' +
+      '<p>2025年10月19日上午9时30分至9时38分，阿波罗长廊经历了它历史上最黑暗的七分钟。</p>' +
+      '<div class="summary-panel"><h2>案件事实摘要</h2><ul>' +
+      '<li><b>4名劫匪</b>：2人伪装成施工人员从外部进入阿波罗长廊作案，2人骑摩托车在外接应</li>' +
+      '<li><b>9件珠宝被抢</b>，其中8件为具有无法估量历史价值的王室珍品</li>' +
+      '<li><b>经济损失预估8800万欧元</b>，历史性损失则无可估量</li>' +
+      '<li><b>作案时长约7分钟</b>：9时30分抵达，9时37分警报触发，9时38分逃离</li>' +
+      '<li><b>欧仁妮皇后王冠被遗弃</b>，缺失1只金鹰饰件和约10颗底座周缘小钻，具备修复条件</li>' +
+      '<li><b>其余8件王室珠宝至今下落不明</b></li>' +
+      '<li><b>4名现场作案嫌疑人已全部归案</b>，失窃珠宝仍未被追回</li>' +
+      '<li><b>卢浮宫阿波罗长廊于2026年7月重新开放</b>，不再展陈珠宝，恢复其17世纪美术陈列室的原始功能</li>' +
+      '</ul><div class="summary-source">以上事实来自法国参议院调查报告、卢浮宫公告、巴黎检方披露的记录。自由模式里那些不同的选择，没有发生过。</div></div></div>';
+  const btn = document.createElement('button'); btn.className = 'choice'; btn.style.marginTop = '20px'; btn.textContent = '重新选择模式';
+  btn.onclick = () => { Sound.click(); resetGame(); }; choicesEl.appendChild(btn);
+}
+
+function showEnding(type) {
+  clearTimeout(typeTimer); typing = false; choicesEl.innerHTML = ''; minigameEl.innerHTML = '';
+  alarmOverlay.classList.remove('on'); screenEl.style.backgroundImage = bgImages.end;
+  let tag, tagCls, title, body, fact;
+  if (type === 'caught') {
+    tag = 'CAUGHT · 被捕'; tagCls = 'bad';
+    title = '出口已经封死';
+    body = '你还没来得及跨上摩托车，塞纳河一侧的出口已经全部封死。\n\n警笛声从里沃利街两端同时压过来。\n\n你手里那只袋子，被按在地上时还攥着。\n\n——后来他们告诉你，你在头盔和手套中留下的DNA，早在你落地之前就已经记录在案了。';
+    fact = '<b>案件后续：</b>4名现场作案嫌疑人已全部归案。34岁阿尔及利亚籍男子在戴高乐机场试图登机飞往阿尔及利亚时被捕，警方通过现场遗留摩托车上的DNA锁定了他；39岁法国籍男子有严重盗窃前科，其DNA来自被打碎的展柜玻璃。';
+  } else if (type === 'timeout') {
+    tag = 'TOO SLOW · 太慢'; tagCls = 'bad';
+    title = '你多待了太久';
+    body = '你在长廊里多待了太久。\n\n警报响起的时候，塞纳河一侧的所有出口已经关闭。\n\n61.34米的长廊，你只跑了一半。';
+    fact = '<b>真实时间线：</b>从破窗进入到骑摩托车逃离，整个作案过程仅持续约4到7分钟。9时37分博物馆通知关闭大门，9时38分盗贼携带展品离开。';
+  } else {
+    tag = 'ESCAPED · 逃离'; tagCls = 'ok';
+    if (state.loot >= 4) {
+      title = '七分钟';
+      body = '9点38分，你们消失在巴黎的车流里。\n\n七分钟。9件珠宝被抢，其中8件为具有无法估量历史价值的王室珍品。经济损失预估8800万欧元，历史性损失则无可估量。\n\n欧仁妮皇后的冠冕留在阳台的石头上——缺了一只金鹰，十字架歪斜，棕榈叶状拱架变形。\n\n这是卢浮宫历史上最严重的失窃案之一。\n\n——但故事没有结束。';
+    } else if (state.loot >= 2) {
+      title = '带走了几件';
+      body = '你跳上摩托车的时候，袋子比预想的轻。\n\n阿波罗长廊里剩下的展柜还亮着灯。\n\n欧仁妮皇后的冠冕躺在阳台的石头上，一只金鹰饰件滚到了墙根。\n\n8800万欧元的估值里，有一部分留在了原地。\n\n——但头盔和手套里留下了你的DNA。';
+    } else {
+      title = '空手';
+      body = '你带出来的东西不多。\n\n但那顶冠冕还是掉在了阳台上——缺了一只金鹰，约十颗小钻散在石缝里。\n\n卢浮宫第二天照常开门，阿波罗长廊被封了起来。\n\n——而头盔和手套里，留下了你的DNA。';
+    }
+    fact = '<b>案件后续：</b>欧仁妮皇后皇冠已被警方找到，缺失1只金鹰饰件和约10颗底座周缘小钻。皇冠56颗祖母绿完好，1354颗钻石中仅约10颗遗失，具备整体修复条件，修复将通过招标遴选资质修复师实施。其余8件王室珠宝仍未被追回。卢浮宫阿波罗长廊于2026年7月重新开放，不再展陈珠宝，恢复其17世纪美术陈列室的原始功能。';
+  }
+
+  const sc = calcScore();
+  const rankCls = (sc.rank === 'D') ? 'd' : '';
+  const bonusTag = sc.efficiencyBonus > 0 ? '<span class="bonus-tag">效率加成 +' + sc.efficiencyBonus + '</span>' : '';
+
+  textEl.innerHTML =
+    '<div class="ending">' +
+      '<div class="ending-tag ' + tagCls + '">' + tag + '</div>' +
+      '<h1>' + title + '</h1>' +
+      '<p>' + body.replace(/\n/g, '<br>') + '</p>' +
+      (type === 'escaped' ?
+        '<div class="rank-card"><div class="rank-letter ' + rankCls + '">' + sc.rank + '</div>' +
+        '<div class="rank-detail">时间剩余　<span>' + Math.floor(state.time) + ' 秒</span>　<span>+' + sc.timeScore + '</span><br>到手珠宝　<span>' + state.loot + ' 件</span>　<span>+' + sc.lootScore + '</span><br>警报控制　<span>' + Math.round(state.alert) + '%</span>　<span>+' + sc.alertScore + '</span>' + bonusTag +
+        '<div class="rank-score">总分 ' + sc.total + ' / 100</div></div></div>' : '') +
+      '<div class="fact-box">' + fact + '</div></div>';
+
+  const btn = document.createElement('button'); btn.className = 'choice'; btn.style.marginTop = '20px'; btn.textContent = '重新选择模式';
+  btn.onclick = () => { Sound.click(); resetGame(); }; choicesEl.appendChild(btn);
+}
+
+function resetGame() {
+  stopTick(); Sound.stopAmbient();
+  state.time = TOTAL_TIME; state.loot = 0; state.alert = 0; state.cuts = 0; state.mistakes = 0; state.choicesMade = 0;
+  clearTimeout(typeTimer); typing = false;
+  textEl.innerHTML = ''; choicesEl.innerHTML = ''; minigameEl.innerHTML = '';
+  alarmOverlay.classList.remove('on'); screenEl.style.backgroundImage = 'none';
+  updateHUD(); modeScreen.classList.remove('hide');
+}
+
+document.querySelectorAll('.mode-card').forEach(card => {
+  card.addEventListener('click', () => {
+    gameMode = card.dataset.mode; Sound.init(); Sound.click();
+    modeScreen.classList.add('hide');
+    setTimeout(() => { updateHUD(); go('intro'); startTick(); }, 400);
+  });
+});
+
+updateHUD();
+</script>
+</body>
+</html>
